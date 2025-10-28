@@ -1,0 +1,37 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build Project (Debug)",
+            "type": "shell",
+
+            // ---- LA NUEVA SECCIÓN CLAVE ----
+            // Esto fuerza a VS Code a usar cmd.exe en lugar de PowerShell
+            "options": {
+                "shell": {
+                    "executable": "cmd.exe",
+                    "args": ["/c"]
+                }
+            },
+            
+            // Ahora 'command' es una sola cadena que 'cmd.exe' ejecutará
+            // ¡Asegúrate de que la ruta a vcvarsall.bat sea la tuya!
+            // (La que tiene "Program Files (x86)")
+            "command": "\"C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\Community\\VC\\Auxiliary\\Build\\vcvarsall.bat\" x64 && cl.exe /Zi /EHsc /std:c++17 /Fe:${workspaceFolder}/build/main.exe /I:${workspaceFolder}/dependencies/include ${workspaceFolder}/src/*.cpp /link /LIBPATH:${workspaceFolder}/dependencies/lib glfw3.lib assimp-vc143-mt.lib opengl32.lib User32.lib Gdi32.lib Shell32.lib",
+            
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": true
+            },
+            "problemMatcher": "$msCompile"
+        }
+    ]
+}
