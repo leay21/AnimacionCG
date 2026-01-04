@@ -4,21 +4,24 @@
         {
             "label": "Build Project (Debug)",
             "type": "shell",
-
-            // ---- LA NUEVA SECCIÓN CLAVE ----
-            // Esto fuerza a VS Code a usar cmd.exe en lugar de PowerShell
-            "options": {
-                "shell": {
-                    "executable": "cmd.exe",
-                    "args": ["/c"]
-                }
-            },
-            
-            // Ahora 'command' es una sola cadena que 'cmd.exe' ejecutará
-            // ¡Asegúrate de que la ruta a vcvarsall.bat sea la tuya!
-            // (La que tiene "Program Files (x86)")
-            "command": "\"C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\Community\\VC\\Auxiliary\\Build\\vcvarsall.bat\" x64 && cl.exe /Zi /EHsc /std:c++17 /Fe:${workspaceFolder}/build/main.exe /I:${workspaceFolder}/dependencies/include ${workspaceFolder}/src/*.cpp /link /LIBPATH:${workspaceFolder}/dependencies/lib glfw3.lib assimp-vc143-mt.lib opengl32.lib User32.lib Gdi32.lib Shell32.lib",
-            
+            "command": "cl.exe",
+            "args": [
+                "/Zi",                           // Generar información de depuración
+                "/EHsc",                         // Habilitar manejo de excepciones
+                "/std:c++17",                    // Usar C++17
+                "/Fe:${workspaceFolder}/build/main.exe", // Archivo de salida .exe
+                "/I:${workspaceFolder}/dependencies/include", // 1. DÓNDE ESTÁN LOS .H
+                "${workspaceFolder}/src/*.cpp",  // 2. QUÉ ARCHIVOS COMPILAR
+                "/link",                         // 3. AHORA EMPIEZA EL ENLAZADOR
+                "/LIBPATH:${workspaceFolder}/dependencies/lib", // 4. DÓNDE ESTÁN LOS .LIB
+                // 5. QUÉ ARCHIVOS .LIB USAR
+                "glfw3.lib",
+                "assimp-vc143-mt.lib",
+                "opengl32.lib",
+                "User32.lib",
+                "Gdi32.lib",
+                "Shell32.lib"
+            ],
             "group": {
                 "kind": "build",
                 "isDefault": true
