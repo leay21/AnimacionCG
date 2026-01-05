@@ -1,14 +1,20 @@
 #pragma once
 
-#include <vector>
-#include <string>
+#include <glad/glad.h> // GLAD debe ir primero
 #include <glm/glm.hpp>
-#include "Vertex.h" // Asegúrate de incluir tu struct Vertex
+#include <glm/gtc/matrix_transform.hpp>
+
+#include <string>
+#include <vector>
+
+#include "Shader.h" // <--- 1. IMPORTANTE: Incluir para poder usar la clase Shader
+#include "Vertex.h"
 
 // Un struct simple para guardar la info de la textura
 struct Texture {
     unsigned int id;
-    std::string type; // ej. "textura_difusa" o "textura_especular"
+    std::string type; // ej. "texture_diffuse" o "texture_specular"
+    std::string path; // guardamos la ruta para comparar con otras texturas cargadas
 };
 
 class Mesh {
@@ -17,7 +23,7 @@ public:
     std::vector<Vertex>       vertices;
     std::vector<unsigned int> indices;
     std::vector<Texture>      textures;
-    unsigned int VAO; // ID del Vertex Array Object
+    unsigned int VAO;
 
     // Constructor
     Mesh(std::vector<Vertex> vertices, std::vector<unsigned int> indices, std::vector<Texture> textures) {
@@ -30,13 +36,47 @@ public:
     }
 
     // Función para dibujar la malla
-    void Draw(/* Shader& shader */) { // Eventualmente pasarás tu shader aquí
-        // ... (código para vincular texturas) ...
+    // <--- 2. CORREGIDO: Recibe el Shader por referencia
+    void Draw(Shader &shader) {
+        // --- Lógica de Texturas ---
+        // Asignamos las texturas a las unidades correspondientes antes de dibujar
+        unsigned int diffuseNr  = 1;
+        unsigned int specularNr = 1;
+        unsigned int normalNr   = 1;
+        unsigned int heightNr   = 1;
 
+        for(unsigned int i = 0; i < textures.size(); i++)
+        {
+            glActiveTexture(GL_TEXTURE0 + i); // Activar unidad de textura apropiada
+            
+            // Recuperar el número de textura (diffuse_textureN)
+            std::string number;
+            std::string name = textures[i].type;
+            
+            if(name == "texture_diffuse")
+                number = std::to_string(diffuseNr++);
+            else if(name == "texture_specular")
+                number = std::to_string(specularNr++);
+            else if(name == "texture_normal")
+                number = std::to_string(normalNr++);
+             else if(name == "texture_height")
+                number = std::to_string(heightNr++);
+
+            // Configurar el sampler en el shader (ej. glUniform1i)
+            // Esto asume que en tu shader tienes uniformes llamados "texture_diffuse1", etc.
+            shader.setInt((name + number).c_str(), i);
+            
+            // Vincular la textura
+            glBindTexture(GL_TEXTURE_2D, textures[i].id);
+        }
+        
         // Dibujar malla
         glBindVertexArray(VAO);
         glDrawElements(GL_TRIANGLES, static_cast<unsigned int>(indices.size()), GL_UNSIGNED_INT, 0);
         glBindVertexArray(0);
+
+        // Buenas prácticas: regresar a la textura 0
+        glActiveTexture(GL_TEXTURE0);
     }
 
 private:
@@ -50,33 +90,35 @@ private:
         glGenBuffers(1, &VBO);
         glGenBuffers(1, &EBO);
 
-        // 2. Vincular VAO
         glBindVertexArray(VAO);
 
-        // 3. Cargar datos en el VBO (Vertex Buffer Object)
+        // 2. Cargar datos en el VBO
         glBindBuffer(GL_ARRAY_BUFFER, VBO);
+        // Struct memory layout es secuencial, podemos pasar el puntero al primer elemento
         glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex), &vertices[0], GL_STATIC_DRAW);
 
-        // 4. Cargar datos en el EBO (Element Buffer Object)
+        // 3. Cargar datos en el EBO
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), &indices[0], GL_STATIC_DRAW);
 
-        // 5. Configurar los punteros de atributos de vértice (Vertex Attrib Pointers)
-        // Le dice a OpenGL cómo leer el VBO
+        // 4. Configurar punteros de atributos (Layouts del Vertex Shader)
         
-        // Posición
+        // Posición (location = 0)
         glEnableVertexAttribArray(0);
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);
         
-        // Normales
+        // Normales (location = 1)
         glEnableVertexAttribArray(1);
         glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, Normal));
         
-        // Coordenadas de Textura
+        // Coordenadas de Textura (location = 2)
         glEnableVertexAttribArray(2);
         glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, TexCoords));
 
-        // Desvincular VAO
+        // Tangentes y Bitangentes (Opcional, si tu Vertex.h las tiene)
+        // glEnableVertexAttribArray(3); ...
+        // glEnableVertexAttribArray(4); ...
+
         glBindVertexArray(0);
     }
 };
