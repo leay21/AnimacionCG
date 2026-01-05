@@ -65,12 +65,16 @@ int main()
         return -1;
     }
 
-    // Configuración global de OpenGL (Z-Buffer es vital para 3D)
-    glEnable(GL_DEPTH_TEST);
+    // Configuración global de OpenGL
+    glEnable(GL_DEPTH_TEST); // Z-Buffer (Ya lo tenías)
+    glEnable(GL_CULL_FACE);  // Activar la eliminación de caras ocultas
+    glEnable(GL_BLEND);      // (Opcional) Para transparencia si la necesitaras
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     // 2. Cargar Shaders
     // Asegúrate de que las rutas sean correctas respecto a tu carpeta de proyecto
     Shader ourShader("src/basic.vert", "src/basic.frag");
+    Shader outlineShader("src/outline.vert", "src/outline.frag"); // <--- NUEVO
 
     // 3. Cargar Modelo
     // IMPORTANTE: Ruta al archivo FBX. Si tu carpeta se llama 'assets', esto debe coincidir.
@@ -81,39 +85,76 @@ int main()
     // 4. Bucle de Renderizado
     while (!glfwWindowShouldClose(window))
     {
-        // Calcular delta time
+        // --- 1. Lógica de Tiempo y Entrada ---
         float currentFrame = static_cast<float>(glfwGetTime());
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
 
-        // Entrada
         processInput(window);
 
-        // Limpiar pantalla y buffer de profundidad
+        // --- 2. Limpiar Pantalla ---
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        // Activar Shader
-        ourShader.use();
-
-        // --- Transformaciones de Cámara (View & Projection) ---
+        // --- 3. Calcular Matrices Comunes (View & Projection) ---
+        // Se calculan una sola vez por frame porque son iguales para el contorno y el modelo
         glm::mat4 projection = glm::perspective(glm::radians(fov), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
         glm::mat4 view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
+
+        // Matriz Base del Modelo (Posición, Rotación original)
+        glm::mat4 modelBase = glm::mat4(1.0f);
+        modelBase = glm::translate(modelBase, glm::vec3(0.0f, -1.0f, 0.0f)); 
+        modelBase = glm::rotate(modelBase, glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+        // NOTA: No aplicamos la escala aquí todavía, lo haremos en cada pase
+
+        // ==========================================================
+        // PASE 1: DIBUJAR EL CONTORNO NEGRO (El "Casco")
+        // ==========================================================
+        
+        // A. Cull Front: Le decimos a OpenGL que oculte las caras delanteras 
+        // y muestre las traseras (el interior del modelo).
+        glCullFace(GL_FRONT); 
+
+        // B. Usar Shader de Contorno
+        outlineShader.use();
+        outlineShader.setMat4("projection", projection);
+        outlineShader.setMat4("view", view);
+
+        // C. Escalar el modelo (hacerlo "gordo")
+        // Multiplicamos por 1.03f (3% más grande). Si el borde es muy grueso, baja a 1.02f
+        glm::mat4 modelOutline = glm::scale(modelBase, glm::vec3(1.01f, 1.01f, 1.01f)); 
+        outlineShader.setMat4("model", modelOutline);
+
+        // D. Dibujar
+        ourModel.Draw(outlineShader);
+
+
+        // ==========================================================
+        // PASE 2: DIBUJAR EL MODELO NORMAL (Cel Shading)
+        // ==========================================================
+        
+        // A. Cull Back: Volvemos a la normalidad (ocultar caras traseras)
+        glCullFace(GL_BACK); 
+
+        // B. Usar Shader Principal
+        ourShader.use();
         ourShader.setMat4("projection", projection);
         ourShader.setMat4("view", view);
+        
+        // C. Escalar el modelo (tamaño normal 1.0)
+        glm::mat4 modelNormal = glm::scale(modelBase, glm::vec3(1.0f, 1.0f, 1.0f));
+        ourShader.setMat4("model", modelNormal);
 
-        // --- Transformaciones del Modelo (World) ---
-        glm::mat4 model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(0.0f, -1.0f, 0.0f)); // Bajarlo un poco para que quede centrado
-        // --- AGREGA ESTA LÍNEA PARA LEVANTAR AL PERSONAJE ---
-        model = glm::rotate(model, glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-        model = glm::scale(model, glm::vec3(1.0f, 1.0f, 1.0f));
-        ourShader.setMat4("model", model);
+        // D. Configuración de Luz (necesaria para el Cel Shading)
+        ourShader.setVec3("lightPos", glm::vec3(2.0f, 4.0f, 3.0f));
+        ourShader.setVec3("viewPos", cameraPos);
 
-        // Dibujar modelo
+        // E. Dibujar
         ourModel.Draw(ourShader);
 
-        // Swap buffers
+        // ==========================================================
+
+        // Swap buffers y eventos
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
