@@ -82,6 +82,42 @@ int main()
     std::cout << "Cargando modelo... (esto puede tardar unos segundos)" << std::endl;
     Model ourModel("assets/goku/GokuFinal.fbx");
 
+    // --- Configuración del Suelo (Plane) ---
+    float planeVertices[] = {
+        // posiciones          // normales         // texturas
+         25.0f, -0.0f,  25.0f,  0.0f, 1.0f, 0.0f,  25.0f,  0.0f,
+        -25.0f, -0.0f,  25.0f,  0.0f, 1.0f, 0.0f,   0.0f,  0.0f,
+        -25.0f, -0.0f, -25.0f,  0.0f, 1.0f, 0.0f,   0.0f, 25.0f,
+
+         25.0f, -0.0f,  25.0f,  0.0f, 1.0f, 0.0f,  25.0f,  0.0f,
+        -25.0f, -0.0f, -25.0f,  0.0f, 1.0f, 0.0f,   0.0f, 25.0f,
+         25.0f, -0.0f, -25.0f,  0.0f, 1.0f, 0.0f,  25.0f, 25.0f
+    };
+    
+    // VAO y VBO del suelo
+    unsigned int planeVAO, planeVBO;
+    glGenVertexArrays(1, &planeVAO);
+    glGenBuffers(1, &planeVBO);
+    
+    glBindVertexArray(planeVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, planeVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(planeVertices), planeVertices, GL_STATIC_DRAW);
+    
+    // Atributos (coinciden con layout location en basic.vert)
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0); // Posición
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float))); // Normal
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float))); // Textura
+    glBindVertexArray(0);
+
+    // Cargar textura del suelo (Necesitas una imagen, ej: "grass.jpg" o "tile.jpg")
+    // Usamos la función auxiliar que ya tienes en Model.h, pero como es estática/global, 
+    // quizás necesites copiarla al main o hacerla accesible. 
+    // Por ahora, asumamos que tienes una textura o usamos una de Goku temporalmente.
+    unsigned int floorTexture = TextureFromFile("grass.jpg", "assets/textures");
+
     // 4. Bucle de Renderizado
     while (!glfwWindowShouldClose(window))
     {
@@ -153,6 +189,27 @@ int main()
         ourModel.Draw(ourShader);
 
         // ==========================================================
+        // --- DIBUJAR SUELO ---
+        
+        // 1. Desactivamos el Face Culling temporalmente para que el suelo se vea siempre
+        glDisable(GL_CULL_FACE); 
+
+        glm::mat4 modelPlane = glm::mat4(1.0f);
+        modelPlane = glm::translate(modelPlane, glm::vec3(0.0f, -1.01f, 0.0f)); 
+        
+        ourShader.setMat4("model", modelPlane);
+        
+        // Activar textura
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, floorTexture); 
+        ourShader.setInt("texture_diffuse1", 0);
+
+        glBindVertexArray(planeVAO);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        glBindVertexArray(0);
+
+        // 2. Reactivamos el Culling para el siguiente frame (importante para el outline)
+        glEnable(GL_CULL_FACE);
 
         // Swap buffers y eventos
         glfwSwapBuffers(window);
