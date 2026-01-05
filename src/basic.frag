@@ -11,30 +11,26 @@ uniform vec3 viewPos;    // Posición de la cámara (para brillo especular, opci
 
 void main()
 {
-    // 1. Configuración básica
     vec3 color = texture(texture_diffuse1, TexCoords).rgb;
     vec3 norm = normalize(Normal);
-    vec3 lightDir = normalize(lightPos - FragPos);
+    
+    // --- CAMBIO CLAVE: LUZ TIPO SOL (DIRECTIONAL LIGHT) ---
+    // En lugar de (lightPos - FragPos), usamos directamente lightPos como dirección
+    // asumiendo que lightPos es un vector que apunta HACIA la luz (ej: arriba).
+    vec3 lightDir = normalize(lightPos); 
 
-    // 2. Iluminación Difusa (Lambert)
+    // Iluminación Difusa
     float diff = max(dot(norm, lightDir), 0.0);
 
-    // --- CEL SHADING (TOON) ---
-    // En lugar de usar 'diff' tal cual, lo "escalonamos".
-    // Esto crea 3 niveles de luz: Sombra, Tono medio, Luz plena.
+    // --- CEL SHADING ---
     float levels = 3.0;
     float level = floor(diff * levels);
     float toonDiff = level / levels;
-    // --------------------------
 
-    // 3. Luz Ambiental (para que la sombra no sea negra pura)
-    vec3 ambient = 0.4 * color; 
-    
-    // 4. Resultado final
-    // Multiplicamos el color de la textura por la intensidad toon
+    // Luz Ambiental un poco más fuerte para exteriores (0.6)
+    vec3 ambient = 0.6 * color; 
     vec3 diffuse = color * toonDiff; 
     
     vec3 result = ambient + diffuse;
-    
     FragColor = vec4(result, 1.0);
 }
