@@ -120,7 +120,6 @@ int main()
     // Texturas
     unsigned int floorTexture = TextureFromFile("grass.jpg", "assets/textures");
     unsigned int poderTexture = TextureFromFile("rayo.jpg", "assets/textures");
-    // IMPORTANTE: Asegúrate de tener sky.jpg, si no, usa grass.jpg para probar
     unsigned int skyTexture   = TextureFromFile("sky.jpg", "assets/textures"); 
 
     while (!glfwWindowShouldClose(window))
@@ -152,8 +151,6 @@ int main()
         glm::mat4 view = glm::lookAt(cameraPos, gokuPos + glm::vec3(0.0f, 1.5f, 0.0f), cameraUp);
 
         // --- RENDERIZADO DEL CIELO (SKYBOX/DOME) ---
-        
-        // CAMBIO: En lugar de glCullFace(GL_FRONT), usamos Disable.
         // Esto obliga a dibujar la esfera por ambos lados.
         glDisable(GL_CULL_FACE); 
 
@@ -169,7 +166,6 @@ int main()
         ourShader.setVec3("lightPos", glm::vec3(0.0f, 200.0f, 0.0f)); 
 
         glActiveTexture(GL_TEXTURE0);
-        // Asegúrate que skyTexture se cargó bien (si no, prueba con floorTexture aquí para testear)
         glBindTexture(GL_TEXTURE_2D, skyTexture);
         ourShader.setInt("texture_diffuse1", 0);
         

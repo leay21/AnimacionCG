@@ -49,8 +49,6 @@ private:
                 x = xy * cosf(sectorAngle);             // r * cos(u) * cos(v)
                 y = xy * sinf(sectorAngle);             // r * cos(u) * sin(v)
                 
-                // NOTA: En OpenGL Y suele ser arriba. Aquí Z es arriba según la fórmula matemática pura,
-                // pero intercambiamos Y y Z abajo para que coincida con tu mundo.
                 
                 // Agregamos vértice: Posición (X, Y, Z) - Intercambiamos Y/Z para que los polos queden verticales
                 vertices.push_back(x);

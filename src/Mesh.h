@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-#include "Shader.h" // <--- 1. IMPORTANTE: Incluir para poder usar la clase Shader
+#include "Shader.h"
 #include "Vertex.h"
 
 // Un struct simple para guardar la info de la textura
@@ -63,7 +63,6 @@ public:
                 number = std::to_string(heightNr++);
 
             // Configurar el sampler en el shader (ej. glUniform1i)
-            // Esto asume que en tu shader tienes uniformes llamados "texture_diffuse1", etc.
             shader.setInt((name + number).c_str(), i);
             
             // Vincular la textura
