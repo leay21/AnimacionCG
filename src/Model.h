@@ -144,13 +144,25 @@ private:
 
 unsigned int TextureFromFile(const char *path, const std::string &directory, bool gamma) {
     std::string filename = std::string(path);
+
+    // --- CORRECCIÓN DE RUTA ---
+    // El FBX puede traer rutas internas como "Final.fbm\Texture.png"
+    // Buscamos la última barra ('\' o '/') y nos quedamos solo con el nombre final del archivo.
+    size_t lastSlash = filename.find_last_of("/\\");
+    if (lastSlash != std::string::npos) {
+        filename = filename.substr(lastSlash + 1);
+    }
+    // ---------------------------
+
     filename = directory + '/' + filename;
 
     unsigned int textureID;
     glGenTextures(1, &textureID);
 
     int width, height, nrComponents;
+    // Cargar la imagen
     unsigned char *data = stbi_load(filename.c_str(), &width, &height, &nrComponents, 0);
+    
     if (data) {
         GLenum format;
         if (nrComponents == 1)
@@ -164,6 +176,7 @@ unsigned int TextureFromFile(const char *path, const std::string &directory, boo
         glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
         glGenerateMipmap(GL_TEXTURE_2D);
 
+        // Configuración de repetición y filtrado (importante para que se vea bien)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
