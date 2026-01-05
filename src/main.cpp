@@ -7,6 +7,7 @@
 
 #include "Shader.h"
 #include "Model.h"
+#include "Sphere.h"
 
 #include <iostream>
 
@@ -22,6 +23,11 @@ glm::vec3 cameraUp    = glm::vec3(0.0f, 1.0f, 0.0f);
 glm::vec3 gokuPos = glm::vec3(0.0f, 0.0f, 0.0f); 
 float gokuAngle = 0.0f;                          
 
+// --- Variables del Ataque Especial (NUEVO) ---
+bool isAttacking = false;
+float attackTime = 0.0f; 
+glm::vec3 spherePos;     
+
 // Variables de mouse
 float lastX =  SCR_WIDTH / 2.0;
 float lastY =  SCR_HEIGHT / 2.0;
@@ -35,6 +41,22 @@ float lastFrame = 0.0f;
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow *window);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
+
+// --- Función Matemática: Curva de Bézier Cúbica ---
+glm::vec3 calculateBezier(float t, glm::vec3 p0, glm::vec3 p1, glm::vec3 p2, glm::vec3 p3) {
+    float u = 1.0f - t;
+    float tt = t * t;
+    float uu = u * u;
+    float uuu = uu * u;
+    float ttt = tt * t;
+
+    glm::vec3 p = uuu * p0; // (1-t)^3 * P0
+    p += 3 * uu * t * p1;   // 3(1-t)^2 * t * P1
+    p += 3 * u * tt * p2;   // 3(1-t) * t^2 * P2
+    p += ttt * p3;          // t^3 * P3
+
+    return p;
+}
 
 int main()
 {
@@ -71,13 +93,15 @@ int main()
     Shader ourShader("src/basic.vert", "src/basic.frag");
     Shader outlineShader("src/outline.vert", "src/outline.frag");
 
-    // 3. Cargar Modelos (CAMBIO AQUÍ: Cargamos los dos estados)
-    // Asegúrate de que los archivos existan en esa ruta
+    // 3. Cargar Modelos
     std::cout << "Cargando modelo Idle..." << std::endl;
     Model idleModel("assets/goku/GokuIdle.fbx");
 
     std::cout << "Cargando modelo Run..." << std::endl;
     Model runModel("assets/goku/GokuRun.fbx");
+
+    // Crear esfera de energía
+    Sphere energyBall(0.3f, 24, 24);
 
     // --- Configuración del Suelo ---
     float planeVertices[] = {
@@ -104,6 +128,7 @@ int main()
     glBindVertexArray(0);
 
     unsigned int floorTexture = TextureFromFile("grass.jpg", "assets/textures");
+    unsigned int poder = TextureFromFile("rayo.jpg", "assets/textures");
 
     // 4. Bucle Principal
     while (!glfwWindowShouldClose(window))
@@ -119,11 +144,10 @@ int main()
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         // --- LÓGICA DE SELECCIÓN DE MODELO ---
-        // Si W o S están presionados, usamos el modelo corriendo
         bool isMoving = glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS || 
                         glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS;
         
-        Model* currentModel; // Puntero al modelo actual
+        Model* currentModel; 
         if (isMoving) {
             currentModel = &runModel;
         } else {
@@ -146,14 +170,8 @@ int main()
 
         // --- MATRIZ BASE DEL PERSONAJE ---
         glm::mat4 modelBase = glm::mat4(1.0f);
-        
-        // 1. Posición base
         modelBase = glm::translate(modelBase, gokuPos); 
-        
-        // 2. Rotación de dirección (A/D)
         modelBase = glm::rotate(modelBase, glm::radians(gokuAngle), glm::vec3(0.0f, 1.0f, 0.0f)); 
-
-        // 3. Ajustes de orientación (Rotación -90 en X es estándar para Mixamo)
         modelBase = glm::rotate(modelBase, glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f)); 
         modelBase = glm::translate(modelBase, glm::vec3(0.0f, -1.0f, 0.0f));
 
@@ -165,7 +183,7 @@ int main()
         glm::mat4 modelOutline = glm::scale(modelBase, glm::vec3(1.02f, 1.02f, 1.02f)); 
         outlineShader.setMat4("model", modelOutline);
         
-        currentModel->Draw(outlineShader); // Dibujamos el modelo seleccionado
+        currentModel->Draw(outlineShader);
 
         // PASE 2: GOKU NORMAL
         glCullFace(GL_BACK); 
@@ -179,12 +197,56 @@ int main()
         glm::mat4 modelNormal = glm::scale(modelBase, glm::vec3(1.0f, 1.0f, 1.0f));
         ourShader.setMat4("model", modelNormal);
         
-        currentModel->Draw(ourShader); // Dibujamos el modelo seleccionado
+        currentModel->Draw(ourShader);
+
+        // =====================================
+        // ATAQUE ESPECIAL (BOLA DE ENERGÍA CON BEZIER)
+        // =====================================
+        if (isAttacking) {
+            // 1. Avanzar el tiempo
+            attackTime += deltaTime * 1.5f; // Velocidad del proyectil
+
+            // 2. Definir los 4 puntos de la curva
+            // P0: Origen (Un poco arriba de Goku)
+            glm::vec3 p0 = gokuPos + glm::vec3(0.0f, 1.5f, 0.0f);
+            
+            // P3: Destino (10 metros adelante en la dirección que mira Goku)
+            float dist = 10.0f;
+            glm::vec3 p3;
+            p3.x = gokuPos.x + sin(glm::radians(gokuAngle)) * dist;
+            p3.z = gokuPos.z + cos(glm::radians(gokuAngle)) * dist;
+            p3.y = gokuPos.y + 0.5f; // Cerca del suelo
+
+            // P1 y P2: Puntos de control para la curva
+            glm::vec3 p1 = p0 + glm::vec3(0.0f, 3.0f, 0.0f); // Sube mucho
+            glm::vec3 p2 = p3 + glm::vec3(0.0f, 2.0f, 0.0f); // Baja suave
+
+            // 3. Calcular posición y dibujar
+            if (attackTime <= 1.0f) {
+                spherePos = calculateBezier(attackTime, p0, p1, p2, p3);
+                
+                glm::mat4 modelBall = glm::mat4(1.0f);
+                modelBall = glm::translate(modelBall, spherePos);
+                modelBall = glm::scale(modelBall, glm::vec3(0.5f, 0.5f, 0.5f)); 
+                
+                ourShader.setMat4("model", modelBall);
+                
+                // Usamos la textura de 'poder' (rayo.jpg)
+                glActiveTexture(GL_TEXTURE0);
+                glBindTexture(GL_TEXTURE_2D, poder); 
+                ourShader.setInt("texture_diffuse1", 0);
+
+                energyBall.Draw();
+            } else {
+                isAttacking = false; // Fin del ataque
+            }
+        }
+        // =====================================
 
         // SUELO
         glDisable(GL_CULL_FACE); 
         glm::mat4 modelPlane = glm::mat4(1.0f);
-        modelPlane = glm::translate(modelPlane, glm::vec3(0.0f, 0.0f, 0.0f)); 
+        modelPlane = glm::translate(modelPlane, glm::vec3(0.0f, -0.01f, 0.0f)); 
         
         ourShader.setMat4("model", modelPlane);
         glActiveTexture(GL_TEXTURE0);
@@ -214,22 +276,25 @@ void processInput(GLFWwindow *window)
     float moveSpeed = 4.0f * deltaTime;
     float rotSpeed  = 90.0f * deltaTime;
 
-    // W: Avanzar
+    // Movimiento
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
         gokuPos.x += sin(glm::radians(gokuAngle)) * moveSpeed;
         gokuPos.z += cos(glm::radians(gokuAngle)) * moveSpeed;
     }
-    // S: Retroceder
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
         gokuPos.x -= sin(glm::radians(gokuAngle)) * moveSpeed;
         gokuPos.z -= cos(glm::radians(gokuAngle)) * moveSpeed;
     }
-    // A: Girar Izquierda
     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
         gokuAngle += rotSpeed;
-    // D: Girar Derecha
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
         gokuAngle -= rotSpeed;
+
+    // Disparo (NUEVO)
+    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS && !isAttacking) {
+        isAttacking = true;
+        attackTime = 0.0f;
+    }
 }
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
